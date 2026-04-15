@@ -353,7 +353,7 @@ const SECTIONS=[
   {name:"유니온 4권",icon:"📙",questions:QUESTIONS.filter(q=>q.section==="유니온 4권")}
 ];
 
-let currentQ=null,currentQIdx=-1,currentSectionIdx=-1,wrongNotes=[],memoNotes=[],viewData={},answerData={},currentMemoTab='wrong',currentMemoFilter='all',appInitialized=false;
+let currentQ=null,currentQIdx=-1,currentSectionIdx=-1,wrongNotes=[],memoNotes=[],viewData={},answerData={},currentMemoTab='wrong',currentMemoFilter='all',appInitialized=false,wrongReviewMode=false,wrongReviewList=[];
 let viewMode='welcome'; // welcome | grid | quiz
 
 function escapeHtml(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML;}
@@ -383,7 +383,7 @@ function buildBookList(){
   });
 }
 
-function showGrid(si){
+function showGrid(si){wrongReviewMode=false;wrongReviewList=[];
   currentSectionIdx=si;viewMode='grid';currentQ=null;
   document.getElementById('welcomeScreen').style.display='none';
   document.getElementById('quizContainer').style.display='none';
@@ -491,7 +491,7 @@ function loadQuestion(q){
   document.getElementById('gridContainer').style.display='none';
   document.getElementById('quizContainer').style.display='block';
   document.getElementById('backBtn').style.display='inline-block';
-  document.getElementById('headerTitle').textContent=q.section+' · Q'+q.num;
+  document.getElementById('headerTitle').textContent=wrongReviewMode?'❌ 오답복습 · '+q.section+' Q'+q.num:q.section+' · Q'+q.num;
   const secQs=SECTIONS.find(s=>s.name===q.section);
   const doneInSec=secQs?secQs.questions.filter(qq=>answerData[getQKey(qq)]).length:0;
   const totalInSec=secQs?secQs.questions.length:0;
@@ -515,15 +515,24 @@ function renderQuiz(){
   h+='</div>';
   if(ea)h+=renderResult(q,ea.selected);
   h+=renderNoteSection(q);
-  // Nav: within same section
-  const secQs=SECTIONS.find(s=>s.name===q.section);
-  if(secQs){
-    const qi=secQs.questions.indexOf(q);
-    h+='<div class="quiz-nav">';
-    if(qi>0)h+='<button onclick="loadQuestion(SECTIONS['+SECTIONS.indexOf(secQs)+'].questions['+(qi-1)+'])">← 이전</button>';else h+='<div></div>';
-    if(qi<secQs.questions.length-1)h+='<button class="primary" onclick="loadQuestion(SECTIONS['+SECTIONS.indexOf(secQs)+'].questions['+(qi+1)+'])">다음 →</button>';
-    h+='</div>';
+  // Nav
+  h+='<div class="quiz-nav">';
+  if(wrongReviewMode&&wrongReviewList.length){
+    const wi=wrongReviewList.indexOf(q);
+    const wTotal=wrongReviewList.length;
+    if(wi>0)h+='<button onclick="loadWrongReviewQ('+(wi-1)+')">← 이전 오답</button>';else h+='<div></div>';
+    h+='<span style="font-size:12px;color:#888;align-self:center">'+(wi+1)+'/'+wTotal+'</span>';
+    if(wi<wTotal-1)h+='<button class="primary" onclick="loadWrongReviewQ('+(wi+1)+')">다음 오답 →</button>';
+    else h+='<button onclick="wrongReviewMode=false;wrongReviewList=[];showGrid(currentSectionIdx>=0?currentSectionIdx:0)">오답복습 완료</button>';
+  }else{
+    const secQs=SECTIONS.find(s=>s.name===q.section);
+    if(secQs){
+      const qi=secQs.questions.indexOf(q);
+      if(qi>0)h+='<button onclick="loadQuestion(SECTIONS['+SECTIONS.indexOf(secQs)+'].questions['+(qi-1)+'])">← 이전</button>';else h+='<div></div>';
+      if(qi<secQs.questions.length-1)h+='<button class="primary" onclick="loadQuestion(SECTIONS['+SECTIONS.indexOf(secQs)+'].questions['+(qi+1)+'])">다음 →</button>';
+    }
   }
+  h+='</div>';
   h+='</div>';c.innerHTML=h;
 }
 
@@ -547,9 +556,11 @@ function switchMemoTab(t){currentMemoTab=t;document.querySelectorAll('.memo-tab-
 function renderFilterChips(){const b=document.getElementById('memoFilterBar');b.innerHTML='';const a=document.createElement('button');a.className='memo-filter-chip'+(currentMemoFilter==='all'?' active':'');a.textContent='전체';a.onclick=()=>{currentMemoFilter='all';renderFilterChips();renderMemoPanel();};b.appendChild(a);SECTIONS.forEach(s=>{const c=document.createElement('button');c.className='memo-filter-chip'+(currentMemoFilter===s.name?' active':'');const items=currentMemoTab==='wrong'?wrongNotes.filter(n=>n.section===s.name):memoNotes.filter(n=>n.section===s.name);c.textContent=s.name+' ('+items.length+')';c.onclick=()=>{currentMemoFilter=s.name;renderFilterChips();renderMemoPanel();};b.appendChild(c);});}
 function renderMemoPanel(){renderFilterChips();const ns=currentMemoTab==='wrong'?wrongNotes:memoNotes;const f=currentMemoFilter==='all'?ns:ns.filter(n=>n.section===currentMemoFilter);const lid=currentMemoTab==='wrong'?'wrongList':'memoList';const l=document.getElementById(lid);if(!f.length){l.innerHTML='<div class="memo-empty">'+(currentMemoTab==='wrong'?'오답노트가 없습니다':'메모가 없습니다')+'</div>';return;}let h='';f.sort((a,b)=>b.created-a.created).forEach(n=>{h+='<div class="memo-item '+(currentMemoTab==='wrong'?'wrong':'note')+'" onclick="jumpToQ(\''+n.qKey+'\')"><div class="memo-q">'+n.section+' Q'+n.qNum+' · '+escapeHtml(n.qText)+'...</div><div class="memo-text">'+escapeHtml(n.text)+'</div><button class="memo-del" onclick="event.stopPropagation();deleteNote(\''+currentMemoTab+'\','+n.id+')">×</button></div>';});l.innerHTML=h;}
 function jumpToQ(qKey){const q=QUESTIONS.find(q=>getQKey(q)===qKey);if(q){const si=SECTIONS.findIndex(s=>s.name===q.section);if(si>=0)currentSectionIdx=si;loadQuestion(q);}}
+function loadWrongReviewQ(idx){if(idx>=0&&idx<wrongReviewList.length){loadQuestion(wrongReviewList[idx]);}}
 function showWrongReview(){
-  const wrongQs=QUESTIONS.filter(q=>{const a=answerData[getQKey(q)];return(a&&!a.correct)||wrongNotes.some(n=>n.qKey===getQKey(q));});
+  const wrongQs=QUESTIONS.filter(q=>{const a=answerData[getQKey(q)];return(a&&!a.correct);});
   if(!wrongQs.length){alert('오답 문제가 없습니다.');return;}
+  wrongReviewMode=true;wrongReviewList=wrongQs;
   loadQuestion(wrongQs[0]);
 }
 function exportNotes(){let t='===== 정형외과 전문의 시험 노트 =====\n\n';if(wrongNotes.length){t+='[ 오답노트 ]\n\n';wrongNotes.forEach(n=>{t+='['+n.section+' Q'+n.qNum+'] '+n.text+'\n\n';});}if(memoNotes.length){t+='\n[ 메모 ]\n\n';memoNotes.forEach(n=>{t+='['+n.section+' Q'+n.qNum+'] '+n.text+'\n\n';});}const b=new Blob([t],{type:'text/plain;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='오답노트_메모.txt';a.click();}
