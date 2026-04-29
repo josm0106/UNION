@@ -337,6 +337,34 @@ body{font-family:'Malgun Gothic','Apple SD Gothic Neo','Segoe UI',sans-serif;bac
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script>
+const APP_VERSION='20260429-1742';
+async function _checkForUpdate(){
+  try{
+    const r=await fetch('./index.html?_='+Date.now(),{cache:'no-store'});
+    const t=await r.text();
+    const m=t.match(/APP_VERSION\s*=\s*['"]([^'"]+)['"]/);
+    if(m&&m[1]&&m[1]!==APP_VERSION){
+      console.log('[Update] 새 버전 감지:',APP_VERSION,'→',m[1]);
+      let div=document.getElementById('_updateBanner');
+      if(div)return;
+      div=document.createElement('div');
+      div.id='_updateBanner';
+      div.style.cssText='position:fixed;top:14px;right:14px;background:linear-gradient(135deg,#4a90d9,#6cb2f7);color:#fff;padding:14px 20px;border-radius:10px;z-index:99999;font:14px sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.4);cursor:pointer;user-select:none';
+      div.title='클릭하면 즉시 새로고침';
+      document.body.appendChild(div);
+      let cnt=5;
+      const render=()=>{div.innerHTML='🔄 새 버전 적용 중... <b>'+cnt+'초</b><br><span style=font-size:11px;opacity:.85>클릭하면 즉시 적용</span>';};
+      render();
+      div.onclick=()=>location.reload(true);
+      const tm=setInterval(()=>{cnt--;if(cnt<=0){clearInterval(tm);location.reload(true);}else render();},1000);
+    }
+  }catch(e){console.warn('[Update] 체크 실패:',e);}
+}
+setTimeout(_checkForUpdate,30000);
+setInterval(_checkForUpdate,5*60*1000);
+window._checkForUpdate=_checkForUpdate;
+</script>
+<script>
 const firebaseConfig={apiKey:"AIzaSyD5zH9YzZuZ90vgJqZUC-y2MefJ5Iqnji4",authDomain:"eliteforce-97939.firebaseapp.com",projectId:"eliteforce-97939",storageBucket:"eliteforce-97939.firebasestorage.app",messagingSenderId:"628068933819",appId:"1:628068933819:web:0f423a2995d47256bc899e"};
 firebase.initializeApp(firebaseConfig);const auth=firebase.auth();const db=firebase.firestore();
 try{auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>{});}catch(e){}
